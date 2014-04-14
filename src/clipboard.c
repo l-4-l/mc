@@ -61,16 +61,14 @@ char *clipboard_paste_path = NULL;
 
 /* event callback */
 gboolean
-clipboard_file_to_ext_clip (const gchar * event_group_name, const gchar * event_name,
-                            gpointer init_data, gpointer data)
+clipboard_file_to_ext_clip (event_info_t * event_info, gpointer data, GError ** error)
 {
     char *tmp, *cmd;
     const char *d = getenv ("DISPLAY");
 
-    (void) event_group_name;
-    (void) event_name;
-    (void) init_data;
+    (void) event_info;
     (void) data;
+    (void) error;
 
     if (d == NULL || clipboard_store_path == NULL || clipboard_store_path[0] == '\0')
         return TRUE;
@@ -90,16 +88,14 @@ clipboard_file_to_ext_clip (const gchar * event_group_name, const gchar * event_
 
 /* event callback */
 gboolean
-clipboard_file_from_ext_clip (const gchar * event_group_name, const gchar * event_name,
-                              gpointer init_data, gpointer data)
+clipboard_file_from_ext_clip (event_info_t * event_info, gpointer data, GError ** error)
 {
     char *tmp, *cmd;
     const char *d = getenv ("DISPLAY");
 
-    (void) event_group_name;
-    (void) event_name;
-    (void) init_data;
+    (void) event_info;
     (void) data;
+    (void) error;
 
     if (d == NULL || clipboard_paste_path == NULL || clipboard_paste_path[0] == '\0')
         return TRUE;
@@ -119,17 +115,15 @@ clipboard_file_from_ext_clip (const gchar * event_group_name, const gchar * even
 
 /* event callback */
 gboolean
-clipboard_text_to_file (const gchar * event_group_name, const gchar * event_name,
-                        gpointer init_data, gpointer data)
+clipboard_text_to_file (event_info_t * event_info, gpointer data, GError ** error)
 {
     int file;
     vfs_path_t *fname_vpath = NULL;
     size_t str_len;
     const char *text = (const char *) data;
 
-    (void) event_group_name;
-    (void) event_name;
-    (void) init_data;
+    (void) event_info;
+    (void) error;
 
     if (text == NULL)
         return FALSE;
@@ -157,8 +151,7 @@ clipboard_text_to_file (const gchar * event_group_name, const gchar * event_name
 
 /* event callback */
 gboolean
-clipboard_text_from_file (const gchar * event_group_name, const gchar * event_name,
-                          gpointer init_data, gpointer data)
+clipboard_text_from_file (event_info_t * event_info, gpointer data, GError ** error)
 {
     char buf[BUF_LARGE];
     FILE *f;
@@ -166,9 +159,8 @@ clipboard_text_from_file (const gchar * event_group_name, const gchar * event_na
     gboolean first = TRUE;
     ev_clipboard_text_from_file_t *event_data = (ev_clipboard_text_from_file_t *) data;
 
-    (void) event_group_name;
-    (void) event_name;
-    (void) init_data;
+    (void) event_info;
+    (void) error;
 
     fname = mc_config_get_full_path (EDIT_CLIP_FILE);
     f = fopen (fname, "r");
