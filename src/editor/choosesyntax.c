@@ -42,6 +42,7 @@
 
 #include "edit-impl.h"
 #include "editwidget.h"
+#include "event.h"
 
 /*** global variables ****************************************************************************/
 
@@ -89,15 +90,21 @@ exec_edit_syntax_dialog (const char **names, const char *current_syntax)
 /* --------------------------------------------------------------------------------------------- */
 /*** public functions ****************************************************************************/
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 
-void
-edit_syntax_dialog (WEdit * edit)
+gboolean
+mc_editor_cmd_syntax_show_dialog (event_info_t * event_info, gpointer data, GError ** error)
 {
+    WEdit *edit = (WEdit *) data;
+
     char *current_syntax;
     int old_auto_syntax, syntax;
     char **names;
     gboolean force_reload = FALSE;
     size_t count;
+
+    (void) event_info;
+    (void) error;
 
     current_syntax = g_strdup (edit->syntax_type);
     old_auto_syntax = option_auto_syntax;
@@ -138,6 +145,8 @@ edit_syntax_dialog (WEdit * edit)
     }
 
     g_strfreev (names);
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
