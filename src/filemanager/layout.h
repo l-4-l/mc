@@ -52,7 +52,6 @@ extern panels_layout_t panels_layout;
 
 /*** declarations of public functions ************************************************************/
 void layout_change (void);
-void layout_box (void);
 void setup_panels (void);
 void panels_split_equal (void);
 void panels_split_more (void);
@@ -64,6 +63,7 @@ void swap_panels (void);
 panel_view_mode_t get_display_type (int idx);
 panel_view_mode_t get_current_type (void);
 panel_view_mode_t get_other_type (void);
+panel_view_mode_t get_panel_type (WPanel * panel);
 int get_current_index (void);
 int get_other_index (void);
 const char *get_nth_panel_name (int num);

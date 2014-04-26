@@ -82,6 +82,7 @@ mc_filemanager_init_events (GError ** error)
         {"save_current_file_to_clip_file", mc_panel_cmd_save_current_file_to_clip_file, NULL},
         {"chdir_other", mc_panel_cmd_chdir_other, NULL},
         {"chdir_other_if_link", mc_panel_cmd_chdir_other_if_link, NULL},
+        {"rename", mc_panel_cmd_rename, NULL},
         {"copy_single", mc_panel_cmd_copy_single, NULL},
         {"delete_single", mc_panel_cmd_delete_single, NULL},
         {"enter", mc_panel_cmd_enter, NULL},
@@ -128,6 +129,7 @@ mc_filemanager_init_events (GError ** error)
         {"sort_by_extension", mc_panel_cmd_sort_order_next, NULL},
         {"sort_by_size", mc_panel_cmd_sort_order_next, NULL},
         {"sort_by_mtime", mc_panel_cmd_sort_order_next, NULL},
+        {"help", mc_panel_cmd_help, NULL},
 
         {"select_files", mc_panel_cmd_select_files, NULL},
         {"unselect_files", mc_panel_cmd_unselect_files, NULL},
@@ -142,10 +144,91 @@ mc_filemanager_init_events (GError ** error)
     /* *INDENT-ON* */
 
     /* *INDENT-OFF* */
+    event_init_group_t core_group_events[] =
+    {
+        {"hotlist_add", mc_core_cmd_hotlist_add, NULL},
+        {"change_listing_mode", mc_core_cmd_change_listing_mode, NULL},
+        {"chmod", mc_core_cmd_chmod, NULL},
+        {"chown", mc_core_cmd_chown, NULL},
+        {"chown_advanced", mc_core_cmd_chown, NULL},
+        {"compare_dirs", mc_core_cmd_compare_dirs, NULL},
+        {"configuration_show_dialog", mc_core_cmd_configuration_show_dialog, NULL},
+        {"configuration_confirmations_show_dialog", mc_core_cmd_configuration_confirmations_show_dialog, NULL},
+        {"copy", mc_core_cmd_copy, NULL},
+        {"put_path_to_cmdline", mc_core_cmd_put_path_to_cmdline, NULL},
+        {"put_link_to_cmdline", mc_core_cmd_put_link_to_cmdline, NULL},
+        {"put_tagged_to_cmdline", mc_core_cmd_put_link_to_cmdline, NULL},
+        {"delete", mc_core_cmd_delete, NULL},
+        {"run_diffviewer", mc_core_cmd_run_diffviewer, NULL},
+        {"configuration_display_bits_show_dialog", mc_core_cmd_configuration_display_bits_show_dialog, NULL},
+        {"run_editor", mc_core_cmd_run_editor, NULL},
+        {"run_editor_internal", mc_core_cmd_run_editor, NULL},
+        {"extention_rules_file_edit", mc_core_cmd_extention_rules_file_edit, NULL},
+        {"file_highlight_rules_edit", mc_core_cmd_file_highlight_rules_edit, NULL},
+        {"user_menu_edit", mc_core_cmd_user_menu_edit, NULL},
+        {"symlink_edit", mc_core_cmd_symlink_edit, NULL},
+        {"external_panelize", mc_core_cmd_external_panelize, NULL},
+        {"panelize", mc_core_cmd_panelize, NULL},
+        {"filter", mc_core_cmd_filter, NULL},
+        {"view_filtered", mc_core_cmd_view_filtered, NULL},
+        {"find_file", mc_core_cmd_find_file, NULL},
+        {"panel_info", mc_core_cmd_panel_info, NULL},
+        {"configuration_layout_show_dialog", mc_core_cmd_configuration_layout_show_dialog, NULL},
+        {"configuration_appearance_show_dialog", mc_core_cmd_configuration_appearance_show_dialog, NULL},
+        {"hard_link", mc_core_cmd_hard_link, NULL},
+        {"sym_link_relative", mc_core_cmd_sym_link_relative, NULL},
+        {"sym_link_absolute", mc_core_cmd_sym_link_relative, NULL},
+        {"panel_listing", mc_core_cmd_panel_listing, NULL},
+        {"panel_listing_switch", mc_core_cmd_panel_listing_switch, NULL},
+        {"menu", mc_core_cmd_menu, NULL},
+        {"menu_last_selected", mc_core_cmd_menu_last_selected, NULL},
+        {"mkdir", mc_core_cmd_mkdir, NULL},
+        {"configuration_panel_show_dialog", mc_core_cmd_configuration_panel_show_dialog, NULL},
+        {"quick_cd", mc_core_cmd_quick_cd, NULL},
+        {"hotlist", mc_core_cmd_hotlist, NULL},
+        {"panel_quick_view", mc_core_cmd_panel_quick_view, NULL},
+        {"quiet_quit", mc_core_cmd_quiet_quit, NULL},
+        {"quit", mc_core_cmd_quit, NULL},
+        {"reread", mc_core_cmd_reread, NULL},
+
+#ifdef ENABLE_VFS
+        {"configuration_vfs_show_dialog", mc_core_cmd_configuration_vfs_show_dialog, NULL},
+#endif /* ENABLE_VFS */
+#ifdef ENABLE_VFS_FISH
+        {"fish_connect_show_dialog", mc_core_cmd_fish_connect_show_dialog, NULL},
+#endif
+#ifdef ENABLE_VFS_FTP
+        {"ftp_connect_show_dialog", mc_core_cmd_ftp_connect_show_dialog, NULL},
+#endif
+#ifdef ENABLE_VFS_SFTP
+        {"sftp_connect_show_dialog", mc_core_cmd_sftp_connect_show_dialog, NULL},
+#endif
+#ifdef ENABLE_VFS_SMB
+        {"smb_connect_show_dialog", mc_core_cmd_smb_connect_show_dialog, NULL},
+#endif
+#ifdef ENABLE_BACKGROUND
+        {"show_background_jobs", mc_core_cmd_show_background_jobs, NULL},
+#endif
+#ifdef LISTMODE_EDITOR
+        {"listmode", mc_core_cmd_listmode, NULL},
+#endif
+#ifdef HAVE_CHARSET
+        {"select_encoding", mc_core_cmd_select_encoding, NULL},
+#endif
+#ifdef ENABLE_VFS
+        {"show_vfs_list", mc_core_cmd_show_vfs_list, NULL},
+#endif
+
+        {NULL, NULL, NULL}
+    };
+    /* *INDENT-ON* */
+
+    /* *INDENT-OFF* */
     event_init_t standard_events[] =
     {
         {MCEVENT_GROUP_TREEVIEW, treeview_group_events},
         {MCEVENT_GROUP_FILEMANAGER, filemanager_group_events},
+        {MCEVENT_GROUP_CORE, core_group_events},
         {NULL, NULL}
     };
     /* *INDENT-ON* */

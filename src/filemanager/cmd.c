@@ -83,7 +83,6 @@
 #include "event.h"
 #include "fileopctx.h"
 #include "file.h"               /* file operation routines */
-#include "find.h"               /* find_file() */
 #include "filenot.h"
 #include "hotlist.h"            /* hotlist_show() */
 #include "panel.h"              /* WPanel */
@@ -112,6 +111,13 @@ enum CompareMode
 {
     compare_quick, compare_size_only, compare_thourough
 };
+
+typedef enum
+{
+    LINK_HARDLINK = 0,
+    LINK_SYMLINK_ABSOLUTE,
+    LINK_SYMLINK_RELATIVE
+} link_type_t;
 
 /*** file scope variables ************************************************************************/
 
@@ -187,7 +193,7 @@ set_panel_filter_to (WPanel * p, char *allocated_filter_string)
         p->filter = allocated_filter_string;
     else
         g_free (allocated_filter_string);
-    reread_cmd ();
+    mc_event_raise (MCEVENT_GROUP_CORE, "reread", NULL, NULL, NULL);
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -688,12 +694,18 @@ mc_panel_cmd_file_view_raw (event_info_t * event_info, gpointer data, GError ** 
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
+/** Run plain internal viewer on the currently selected file */
 
-void
-view_filtered_cmd (void)
+gboolean
+mc_core_cmd_view_filtered (event_info_t * event_info, gpointer data, GError ** error)
 {
     char *command;
     const char *initial_command;
+
+    (void) error;
+    (void) event_info;
+    (void) data;
 
     if (cmdline->buffer[0] == '\0')
         initial_command = selection (current_panel)->fname;
@@ -712,6 +724,8 @@ view_filtered_cmd (void)
         g_free (command);
         dialog_switch_process_pending ();
     }
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -752,30 +766,44 @@ edit_file_at_line (const vfs_path_t * what_vpath, gboolean internal, long start_
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 
-void
-edit_cmd (void)
+gboolean
+mc_core_cmd_run_editor (event_info_t * event_info, gpointer data, GError ** error)
 {
     vfs_path_t *fname;
+
+    (void) error;
+    (void) data;
+    (void) event_info;
 
     fname = vfs_path_from_str (selection (current_panel)->fname);
     if (regex_command (fname, "Edit") == 0)
-        do_edit (fname);
+        edit_file_at_line (fname, use_internal_edit != 0, 0);
     vfs_path_free (fname);
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
-
 #ifdef USE_INTERNAL_EDIT
-void
-edit_cmd_force_internal (void)
+/* event callback */
+
+gboolean
+mc_core_cmd_run_editor_internal (event_info_t * event_info, gpointer data, GError ** error)
 {
     vfs_path_t *fname;
+
+    (void) error;
+    (void) data;
+    (void) event_info;
 
     fname = vfs_path_from_str (selection (current_panel)->fname);
     if (regex_command (fname, "Edit") == 0)
         edit_file_at_line (fname, TRUE, 1);
     vfs_path_free (fname);
+
+    return TRUE;
 }
 #endif
 
@@ -809,7 +837,7 @@ mc_panel_cmd_edit_new (event_info_t * event_info, gpointer data, GError ** error
 #ifdef HAVE_CHARSET
     mc_global.source_codepage = default_source_codepage;
 #endif
-    do_edit (fname_vpath);
+    edit_file_at_line (fname_vpath, use_internal_edit != 0, 0);
 
     vfs_path_free (fname_vpath);
 
@@ -817,31 +845,46 @@ mc_panel_cmd_edit_new (event_info_t * event_info, gpointer data, GError ** error
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 /** Invoked by F5.  Copy, default to the other panel.  */
 
-void
-copy_cmd (void)
+gboolean
+mc_core_cmd_copy (event_info_t * event_info, gpointer data, GError ** error)
 {
+    (void) error;
+    (void) event_info;
+    (void) data;
+
     save_cwds_stat ();
     if (panel_operate (current_panel, OP_COPY, FALSE))
     {
         update_panels (UP_OPTIMIZE, UP_KEEPSEL);
         repaint_screen ();
     }
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 /** Invoked by F6.  Move/rename, default to the other panel, ignore marks.  */
 
-void
-rename_cmd (void)
+gboolean
+mc_panel_cmd_rename (event_info_t * event_info, gpointer data, GError ** error)
 {
+    WPanel *panel = (WPanel *) data;
+
+    (void) error;
+    (void) event_info;
+
     save_cwds_stat ();
-    if (panel_operate (current_panel, OP_MOVE, FALSE))
+    if (panel_operate (panel, OP_MOVE, FALSE))
     {
         update_panels (UP_OPTIMIZE, UP_KEEPSEL);
         repaint_screen ();
     }
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -889,12 +932,17 @@ mc_panel_cmd_rename_single (event_info_t * event_info, gpointer data, GError ** 
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 
-void
-mkdir_cmd (void)
+gboolean
+mc_core_cmd_mkdir (event_info_t * event_info, gpointer data, GError ** error)
 {
     char *dir;
     const char *name = "";
+
+    (void) error;
+    (void) event_info;
+    (void) data;
 
     /* If 'on' then automatically fills name with current selected item name */
     if (auto_fill_mkdir_name && !DIR_IS_DOTDOT (selection (current_panel)->fname))
@@ -937,13 +985,21 @@ mkdir_cmd (void)
         vfs_path_free (absdir);
     }
     g_free (dir);
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
+/** Invoked by F18.  Remove selected files.  */
 
-void
-delete_cmd (void)
+gboolean
+mc_core_cmd_delete (event_info_t * event_info, gpointer data, GError ** error)
 {
+    (void) error;
+    (void) event_info;
+    (void) data;
+
     save_cwds_stat ();
 
     if (panel_operate (current_panel, OP_DELETE, FALSE))
@@ -951,6 +1007,8 @@ delete_cmd (void)
         update_panels (UP_OPTIMIZE, UP_KEEPSEL);
         repaint_screen ();
     }
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -977,34 +1035,36 @@ mc_panel_cmd_delete_single (event_info_t * event_info, gpointer data, GError ** 
 }
 
 /* --------------------------------------------------------------------------------------------- */
-
-void
-find_cmd (void)
-{
-    find_file ();
-}
-
-/* --------------------------------------------------------------------------------------------- */
+/* event callback */
 /** Invoked from the left/right menus */
 
-void
-filter_cmd (void)
+gboolean
+mc_core_cmd_filter (event_info_t * event_info, gpointer data, GError ** error)
 {
-    WPanel *p;
+    (void) error;
+    (void) event_info;
+    (void) data;
 
-    if (!SELECTED_IS_PANEL)
-        return;
+    if (SELECTED_IS_PANEL)
+    {
+        WPanel *p = MENU_PANEL;
+        set_panel_filter (p);
+    }
 
-    p = MENU_PANEL;
-    set_panel_filter (p);
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 
-void
-reread_cmd (void)
+gboolean
+mc_core_cmd_reread (event_info_t * event_info, gpointer data, GError ** mcerror)
 {
     panel_update_flags_t flag = UP_ONLY_CURRENT;
+
+    (void) mcerror;
+    (void) event_info;
+    (void) data;
 
     if (get_current_type () == view_listing && get_other_type () == view_listing &&
         vfs_path_equal (current_panel->cwd_vpath, other_panel->cwd_vpath))
@@ -1012,17 +1072,23 @@ reread_cmd (void)
 
     update_panels (UP_RELOAD | flag, UP_KEEPSEL);
     repaint_screen ();
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 
-void
-ext_cmd (void)
+gboolean
+mc_core_cmd_extention_rules_file_edit (event_info_t * event_info, gpointer data, GError ** error)
 {
     vfs_path_t *extdir_vpath;
-    int dir;
+    int dir = 0;
 
-    dir = 0;
+    (void) error;
+    (void) event_info;
+    (void) data;
+
     if (geteuid () == 0)
     {
         dir = query_dialog (_("Extension file edit"),
@@ -1037,7 +1103,7 @@ ext_cmd (void)
 
         buffer_vpath = mc_config_get_full_vpath (MC_FILEBIND_FILE);
         check_for_default (extdir_vpath, buffer_vpath);
-        do_edit (buffer_vpath);
+        edit_file_at_line (buffer_vpath, use_internal_edit != 0, 0);
         vfs_path_free (buffer_vpath);
     }
     else if (dir == 1)
@@ -1047,21 +1113,29 @@ ext_cmd (void)
             vfs_path_free (extdir_vpath);
             extdir_vpath = vfs_path_build_filename (mc_global.share_data_dir, MC_LIB_EXT, NULL);
         }
-        do_edit (extdir_vpath);
+        edit_file_at_line (extdir_vpath, use_internal_edit != 0, 0);
     }
     vfs_path_free (extdir_vpath);
     flush_extension_file ();
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 /** edit file menu for mc */
 
-void
-edit_mc_menu_cmd (void)
+gboolean
+mc_core_cmd_user_menu_edit (event_info_t * event_info, gpointer data, GError ** error)
 {
     vfs_path_t *buffer_vpath;
     vfs_path_t *menufile_vpath;
-    int dir = 0;
+    int dir;
+
+    (void) error;
+    (void) event_info;
+    (void) data;
+
 
     dir = query_dialog (_("Menu edit"),
                         _("Which menu file do you want to edit?"),
@@ -1099,25 +1173,30 @@ edit_mc_menu_cmd (void)
 
     default:
         vfs_path_free (menufile_vpath);
-        return;
+        return TRUE;
     }
 
-    do_edit (buffer_vpath);
+    edit_file_at_line (buffer_vpath, use_internal_edit != 0, 0);
 
     vfs_path_free (buffer_vpath);
     vfs_path_free (menufile_vpath);
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 
-void
-edit_fhl_cmd (void)
+gboolean
+mc_core_cmd_file_highlight_rules_edit (event_info_t * event_info, gpointer data, GError ** error)
 {
     vfs_path_t *fhlfile_vpath = NULL;
+    int dir = 0;
 
-    int dir;
+    (void) error;
+    (void) event_info;
+    (void) data;
 
-    dir = 0;
     if (geteuid () == 0)
     {
         dir = query_dialog (_("Highlighting groups file edit"),
@@ -1132,7 +1211,7 @@ edit_fhl_cmd (void)
 
         buffer_vpath = mc_config_get_full_vpath (MC_FHL_INI_FILE);
         check_for_default (fhlfile_vpath, buffer_vpath);
-        do_edit (buffer_vpath);
+        edit_file_at_line (buffer_vpath, use_internal_edit != 0, 0);
         vfs_path_free (buffer_vpath);
     }
     else if (dir == 1)
@@ -1143,25 +1222,32 @@ edit_fhl_cmd (void)
             fhlfile_vpath =
                 vfs_path_build_filename (mc_global.sysconfig_dir, MC_FHL_INI_FILE, NULL);
         }
-        do_edit (fhlfile_vpath);
+        edit_file_at_line (fhlfile_vpath, use_internal_edit != 0, 0);
     }
     vfs_path_free (fhlfile_vpath);
 
     /* refresh highlighting rules */
     mc_fhl_free (&mc_filehighlight);
     mc_filehighlight = mc_fhl_new (TRUE);
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 
-void
-hotlist_cmd (void)
+gboolean
+mc_core_cmd_hotlist (event_info_t * event_info, gpointer data, GError ** error)
 {
     char *target;
 
+    (void) error;
+    (void) event_info;
+    (void) data;
+
     target = hotlist_show (LIST_HOTLIST);
     if (!target)
-        return;
+        return TRUE;
 
     if (get_current_type () == view_tree)
     {
@@ -1184,36 +1270,50 @@ hotlist_cmd (void)
         g_free (cmd);
     }
     g_free (target);
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 
 #ifdef ENABLE_VFS
-void
-vfs_list (void)
+gboolean
+mc_core_cmd_show_vfs_list (event_info_t * event_info, gpointer data, GError ** error)
 {
     char *target;
     vfs_path_t *target_vpath;
 
+    (void) error;
+    (void) event_info;
+    (void) data;
+
     target = hotlist_show (LIST_VFSLIST);
     if (!target)
-        return;
+        return TRUE;
 
     target_vpath = vfs_path_from_str (target);
     if (!do_cd (target_vpath, cd_exact))
         message (D_ERROR, MSG_ERROR, _("Cannot change directory"));
     vfs_path_free (target_vpath);
     g_free (target);
+
+    return TRUE;
 }
 #endif /* ENABLE_VFS */
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 
-void
-compare_dirs_cmd (void)
+gboolean
+mc_core_cmd_compare_dirs (event_info_t * event_info, gpointer data, GError ** error)
 {
     int choice;
     enum CompareMode thorough_flag;
+
+    (void) error;
+    (void) event_info;
+    (void) data;
 
     choice =
         query_dialog (_("Compare directories"),
@@ -1221,7 +1321,7 @@ compare_dirs_cmd (void)
                       _("&Quick"), _("&Size only"), _("&Thorough"), _("&Cancel"));
 
     if (choice < 0 || choice > 2)
-        return;
+        return TRUE;
 
     thorough_flag = choice;
 
@@ -1235,32 +1335,40 @@ compare_dirs_cmd (void)
         message (D_ERROR, MSG_ERROR,
                  _("Both panels should be in the listing mode\nto use this command"));
     }
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 
-#ifdef USE_DIFF_VIEW
-void
-diff_view_cmd (void)
+gboolean
+mc_core_cmd_run_diffviewer (event_info_t * event_info, gpointer data, GError ** error)
 {
-    ev_diffviewer_run_t event_info;
+    ev_diffviewer_run_t diffviewer_event_info;
+
+    (void) error;
+    (void) event_info;
+    (void) data;
+
 
     /* both panels must be in the list mode */
     if (get_current_type () != view_listing || get_other_type () != view_listing)
-        return;
+        return TRUE;
 
-    event_info.run_mode = mc_global.mc_run_mode;
-    event_info.data.panel.first = current_panel;
-    event_info.data.panel.second = other_panel;
+    diffviewer_event_info.run_mode = mc_global.mc_run_mode;
+    diffviewer_event_info.data.panel.first = current_panel;
+    diffviewer_event_info.data.panel.second = other_panel;
 
-    mc_event_raise (MCEVENT_GROUP_DIFFVIEWER, "run", &event_info, NULL, NULL);
+    mc_event_raise (MCEVENT_GROUP_DIFFVIEWER, "run", &diffviewer_event_info, NULL, NULL);
 
     if (mc_global.mc_run_mode == MC_RUN_FULL)
         update_panels (UP_OPTIMIZE, UP_KEEPSEL);
 
     dialog_switch_process_pending ();
+
+    return TRUE;
 }
-#endif
 
 /* --------------------------------------------------------------------------------------------- */
 
@@ -1294,21 +1402,70 @@ view_other_cmd (void)
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 
-void
-link_cmd (link_type_t link_type)
+gboolean
+mc_core_cmd_hard_link (event_info_t * event_info, gpointer data, GError ** error)
 {
     char *filename = selection (current_panel)->fname;
 
+    (void) error;
+    (void) event_info;
+    (void) data;
+
     if (filename != NULL)
-        do_link (link_type, filename);
+        do_link (LINK_HARDLINK, filename);
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 
-void
-edit_symlink_cmd (void)
+gboolean
+mc_core_cmd_sym_link_relative (event_info_t * event_info, gpointer data, GError ** error)
 {
+    char *filename = selection (current_panel)->fname;
+
+    (void) error;
+    (void) event_info;
+    (void) data;
+
+    if (filename != NULL)
+        do_link (LINK_SYMLINK_RELATIVE, filename);
+
+    return TRUE;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+/* event callback */
+
+gboolean
+mc_core_cmd_sym_link_absolute (event_info_t * event_info, gpointer data, GError ** error)
+{
+    char *filename = selection (current_panel)->fname;
+
+    (void) error;
+    (void) event_info;
+    (void) data;
+
+    if (filename != NULL)
+        do_link (LINK_SYMLINK_ABSOLUTE, filename);
+
+    return TRUE;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+/* event callback */
+
+gboolean
+mc_core_cmd_symlink_edit (event_info_t * event_info, gpointer data, GError ** error)
+{
+
+    (void) error;
+    (void) event_info;
+    (void) data;
+
     if (S_ISLNK (selection (current_panel)->st.st_mode))
     {
         char buffer[MC_MAXPATHLEN];
@@ -1365,14 +1522,21 @@ edit_symlink_cmd (void)
         message (D_ERROR, MSG_ERROR, _("'%s' is not a symbolic link"),
                  selection (current_panel)->fname);
     }
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 
-void
-help_cmd (void)
+gboolean
+mc_panel_cmd_help (event_info_t * event_info, gpointer data, GError ** error)
 {
     ev_help_t event_data = { NULL, NULL };
+
+    (void) error;
+    (void) event_info;
+    (void) data;
 
     if (current_panel->searching)
         event_data.node = "[Quick search]";
@@ -1380,6 +1544,8 @@ help_cmd (void)
         event_data.node = "[main]";
 
     mc_event_raise (MCEVENT_GROUP_CORE, "help", &event_data, NULL, NULL);
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -1464,46 +1630,77 @@ get_random_hint (int force)
 /* --------------------------------------------------------------------------------------------- */
 
 #ifdef ENABLE_VFS_FTP
-void
-ftplink_cmd (void)
+/* event callback */
+
+gboolean
+mc_core_cmd_ftp_connect_show_dialog (event_info_t * event_info, gpointer data, GError ** error)
 {
+    (void) error;
+    (void) event_info;
+    (void) data;
+
     nice_cd (_("FTP to machine"), _(machine_str),
              "[FTP File System]", ":ftplink_cmd: FTP to machine ", "ftp://", 1, TRUE);
+
+    return TRUE;
 }
 #endif /* ENABLE_VFS_FTP */
 
 /* --------------------------------------------------------------------------------------------- */
 
 #ifdef ENABLE_VFS_SFTP
-void
-sftplink_cmd (void)
+/* event callback */
+
+gboolean
+mc_core_cmd_sftp_connect_show_dialog (event_info_t * event_info, gpointer data, GError ** error)
 {
+    (void) error;
+    (void) event_info;
+    (void) data;
+
     nice_cd (_("SFTP to machine"), _(machine_str),
              "[SFTP (SSH File Transfer Protocol) filesystem]",
              ":sftplink_cmd: SFTP to machine ", "sftp://", 1, TRUE);
+
+    return TRUE;
 }
 #endif /* ENABLE_VFS_SFTP */
 
 /* --------------------------------------------------------------------------------------------- */
-
 #ifdef ENABLE_VFS_FISH
-void
-fishlink_cmd (void)
+/* event callback */
+
+gboolean
+mc_core_cmd_fish_connect_show_dialog (event_info_t * event_info, gpointer data, GError ** error)
 {
+    (void) error;
+    (void) event_info;
+    (void) data;
+
     nice_cd (_("Shell link to machine"), _(machine_str),
              "[FIle transfer over SHell filesystem]", ":fishlink_cmd: Shell link to machine ",
              "sh://", 1, TRUE);
+
+    return TRUE;
 }
 #endif /* ENABLE_VFS_FISH */
 
 /* --------------------------------------------------------------------------------------------- */
 
 #ifdef ENABLE_VFS_SMB
-void
-smblink_cmd (void)
+/* event callback */
+
+gboolean
+mc_core_cmd_smb_connect_show_dialog (event_info_t * event_info, gpointer data, GError ** error)
 {
+    (void) error;
+    (void) event_info;
+    (void) data;
+
     nice_cd (_("SMB link to machine"), _(machine_str),
              "[SMB File System]", ":smblink_cmd: SMB link to machine ", "smb://", 0, TRUE);
+
+    return TRUE;
 }
 #endif /* ENABLE_VFS_SMB */
 
@@ -1520,11 +1717,16 @@ undelete_cmd (void)
 #endif /* ENABLE_VFS_UNDELFS */
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 
-void
-quick_cd_cmd (void)
+gboolean
+mc_core_cmd_quick_cd (event_info_t * event_info, gpointer data, GError ** error)
 {
     char *p = cd_dialog ();
+
+    (void) error;
+    (void) event_info;
+    (void) data;
 
     if (p && *p)
     {
@@ -1534,6 +1736,8 @@ quick_cd_cmd (void)
         g_free (q);
     }
     g_free (p);
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -1695,22 +1899,34 @@ quick_cmd_no_menu (void)
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 
-void
-listing_cmd (void)
+gboolean
+mc_core_cmd_panel_listing (event_info_t * event_info, gpointer data, GError ** error)
 {
+    (void) error;
+    (void) event_info;
+    (void) data;
+
     switch_to_listing (MENU_PANEL_IDX);
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 
-void
-change_listing_cmd (void)
+gboolean
+mc_core_cmd_change_listing_mode (event_info_t * event_info, gpointer data, GError ** error)
 {
     int list_type;
     int use_msformat;
     char *user, *status;
     WPanel *p = NULL;
+
+    (void) error;
+    (void) event_info;
+    (void) data;
+
 
     if (SELECTED_IS_PANEL)
         p = MENU_PANEL_IDX == 0 ? left_panel : right_panel;
@@ -1722,6 +1938,8 @@ change_listing_cmd (void)
         p = MENU_PANEL_IDX == 0 ? left_panel : right_panel;
         configure_panel_listing (p, list_type, use_msformat, user, status);
     }
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -1751,28 +1969,60 @@ quick_view_cmd (void)
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
 
-void
-toggle_listing_cmd (void)
+gboolean
+mc_core_cmd_panel_listing_switch (event_info_t * event_info, gpointer data, GError ** error)
 {
     int current;
     WPanel *p;
+
+    (void) error;
+    (void) event_info;
+    (void) data;
+
 
     current = get_current_index ();
     p = PANEL (get_panel_widget (current));
 
     set_basic_panel_listing_to (current, (p->list_type + 1) % LIST_TYPES);
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */
-
 #ifdef HAVE_CHARSET
-void
-encoding_cmd (void)
+/* event callback */
+
+gboolean
+mc_core_cmd_select_encoding (event_info_t * event_info, gpointer data, GError ** error)
 {
+    (void) error;
+    (void) event_info;
+    (void) data;
+
     if (SELECTED_IS_PANEL)
         mc_event_raise (MCEVENT_GROUP_FILEMANAGER, "select_codepage", MENU_PANEL, NULL, NULL);
+
+    return TRUE;
 }
 #endif
 
 /* --------------------------------------------------------------------------------------------- */
+/* event callback */
+
+gboolean
+mc_core_cmd_panel_info (event_info_t * event_info, gpointer data, GError ** error)
+{
+    Widget *sender = WIDGET (data);
+
+    (void) error;
+    (void) event_info;
+
+    if (sender == WIDGET (the_menubar))
+        info_cmd ();            /* menu */
+    else
+        info_cmd_no_menu ();    /* shortcut or buttonbar */
+
+    return TRUE;
+}

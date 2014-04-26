@@ -102,6 +102,103 @@ gboolean mc_panel_cmd_select_invert_files (event_info_t * event_info, gpointer d
 gboolean mc_panel_cmd_select_codepage (event_info_t * event_info, gpointer data, GError ** error);
 #endif /* HAVE_CHARSET */
 
+gboolean mc_core_cmd_hotlist_add (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_change_listing_mode (event_info_t * event_info, gpointer data,
+                                          GError ** error);
+gboolean mc_core_cmd_chmod (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_chown (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_chown_advanced (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_compare_dirs (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_configuration_show_dialog (event_info_t * event_info, gpointer data,
+                                                GError ** error);
+#ifdef ENABLE_VFS
+gboolean mc_core_cmd_configuration_vfs_show_dialog (event_info_t * event_info, gpointer data,
+                                                    GError ** error);
+#endif /* ENABLE_VFS */
+gboolean mc_core_cmd_configuration_confirmations_show_dialog (event_info_t * event_info,
+                                                              gpointer data, GError ** error);
+gboolean mc_core_cmd_copy (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_put_path_to_cmdline (event_info_t * event_info, gpointer data,
+                                          GError ** error);
+gboolean mc_core_cmd_put_link_to_cmdline (event_info_t * event_info, gpointer data,
+                                          GError ** error);
+gboolean mc_core_cmd_put_tagged_to_cmdline (event_info_t * event_info, gpointer data,
+                                            GError ** error);
+gboolean mc_core_cmd_delete (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_run_diffviewer (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_configuration_display_bits_show_dialog (event_info_t * event_info,
+                                                             gpointer data, GError ** error);
+gboolean mc_core_cmd_run_editor (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_run_editor_internal (event_info_t * event_info, gpointer data,
+                                          GError ** error);
+gboolean mc_core_cmd_extention_rules_file_edit (event_info_t * event_info, gpointer data,
+                                                GError ** error);
+gboolean mc_core_cmd_user_menu_edit (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_file_highlight_rules_edit (event_info_t * event_info, gpointer data,
+                                                GError ** error);
+gboolean mc_core_cmd_symlink_edit (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_external_panelize (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_panelize (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_filter (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_view_filtered (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_find_file (event_info_t * event_info, gpointer data, GError ** error);
+#ifdef ENABLE_VFS_FISH
+gboolean mc_core_cmd_fish_connect_show_dialog (event_info_t * event_info, gpointer data,
+                                               GError ** error);
+#endif
+#ifdef ENABLE_VFS_FTP
+gboolean mc_core_cmd_ftp_connect_show_dialog (event_info_t * event_info, gpointer data,
+                                              GError ** error);
+#endif
+#ifdef ENABLE_VFS_SFTP
+gboolean mc_core_cmd_sftp_connect_show_dialog (event_info_t * event_info, gpointer data,
+                                               GError ** error);
+#endif
+#ifdef ENABLE_VFS_SMB
+gboolean mc_core_cmd_smb_connect_show_dialog (event_info_t * event_info, gpointer data,
+                                              GError ** error);
+#endif
+gboolean mc_panel_cmd_help (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_panel_info (event_info_t * event_info, gpointer data, GError ** error);
+
+#ifdef ENABLE_BACKGROUND
+gboolean mc_core_cmd_show_background_jobs (event_info_t * event_info, gpointer data,
+                                           GError ** error);
+#endif
+gboolean mc_core_cmd_configuration_layout_show_dialog (event_info_t * event_info, gpointer data,
+                                                       GError ** error);
+gboolean mc_core_cmd_configuration_appearance_show_dialog (event_info_t * event_info, gpointer data,
+                                                           GError ** error);
+gboolean mc_core_cmd_hard_link (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_sym_link_relative (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_sym_link_absolute (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_panel_listing (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_panel_listing_switch (event_info_t * event_info, gpointer data,
+                                           GError ** error);
+#ifdef LISTMODE_EDITOR
+gboolean mc_core_cmd_listmode (event_info_t * event_info, gpointer data, GError ** error);
+#endif
+gboolean mc_core_cmd_menu (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_menu_last_selected (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_mkdir (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_configuration_panel_show_dialog (event_info_t * event_info, gpointer data,
+                                                      GError ** error);
+#ifdef HAVE_CHARSET
+gboolean mc_core_cmd_select_encoding (event_info_t * event_info, gpointer data, GError ** error);
+#endif
+gboolean mc_core_cmd_quick_cd (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_hotlist (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_panel_quick_view (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_quiet_quit (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_quit (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_panel_cmd_rename (event_info_t * event_info, gpointer data, GError ** error);
+gboolean mc_core_cmd_reread (event_info_t * event_info, gpointer data, GError ** error);
+
+#ifdef ENABLE_VFS
+gboolean mc_core_cmd_show_vfs_list (event_info_t * event_info, gpointer data, GError ** error);
+#endif
+
+
 /*** inline functions ****************************************************************************/
 
 #endif /* MC__FILEMANAGER_EVENT_H */

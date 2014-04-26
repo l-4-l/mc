@@ -59,7 +59,6 @@
 #include "src/subshell.h"
 #endif
 #include "src/setup.h"          /* variables */
-#include "src/learn.h"          /* learn_keys() */
 #include "src/keybind-defaults.h"
 #include "lib/keybind.h"
 #include "lib/event.h"
@@ -72,10 +71,6 @@
 #include "panelize.h"
 #include "command.h"            /* cmdline */
 #include "dir.h"                /* dir_list_clean() */
-
-#include "chmod.h"
-#include "chown.h"
-#include "achown.h"
 
 #ifdef USE_INTERNAL_EDIT
 #include "src/editor/edit.h"
@@ -167,30 +162,6 @@ treebox_cmd (void)
         g_free (ret.s);
     }
 }
-
-/* --------------------------------------------------------------------------------------------- */
-
-#ifdef LISTMODE_EDITOR
-static void
-listmode_cmd (void)
-{
-    char *newmode;
-
-    if (get_current_type () != view_listing)
-        return;
-
-    newmode = listmode_edit (current_panel->user_format);
-    if (!newmode)
-        return;
-
-    g_free (current_panel->user_format);
-    current_panel->list_type = list_user;
-    current_panel->user_format = newmode;
-    set_panel_formats (current_panel);
-
-    do_refresh ();
-}
-#endif /* LISTMODE_EDITOR */
 
 /* --------------------------------------------------------------------------------------------- */
 
@@ -366,32 +337,6 @@ init_menu (void)
     right_menu = create_menu ("", create_panel_menu (), "[Left and Right Menus]");
     menubar_add_menu (the_menubar, right_menu);
     update_menu ();
-}
-
-/* --------------------------------------------------------------------------------------------- */
-
-static void
-menu_last_selected_cmd (void)
-{
-    the_menubar->is_active = TRUE;
-    the_menubar->is_dropped = (drop_menus != 0);
-    the_menubar->previous_widget = dlg_get_current_widget_id (midnight_dlg);
-    dlg_select_widget (the_menubar);
-}
-
-/* --------------------------------------------------------------------------------------------- */
-
-static void
-menu_cmd (void)
-{
-    if (the_menubar->is_active)
-        return;
-
-    if ((get_current_index () == 0) == (current_panel->active != 0))
-        the_menubar->selected = 0;
-    else
-        the_menubar->selected = g_list_length (the_menubar->menu) - 1;
-    menu_last_selected_cmd ();
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -712,75 +657,6 @@ create_panels (void)
 
 /* --------------------------------------------------------------------------------------------- */
 
-static void
-midnight_put_panel_path (WPanel * panel)
-{
-    vfs_path_t *cwd_vpath;
-    const char *cwd_vpath_str;
-
-    if (!command_prompt)
-        return;
-
-#ifdef HAVE_CHARSET
-    cwd_vpath = remove_encoding_from_path (panel->cwd_vpath);
-#else
-    cwd_vpath = vfs_path_clone (panel->cwd_vpath);
-#endif
-
-    cwd_vpath_str = vfs_path_as_str (cwd_vpath);
-
-    command_insert (cmdline, cwd_vpath_str, FALSE);
-
-    if (cwd_vpath_str[strlen (cwd_vpath_str) - 1] != PATH_SEP)
-        command_insert (cmdline, PATH_SEP_STR, FALSE);
-
-    vfs_path_free (cwd_vpath);
-}
-
-/* --------------------------------------------------------------------------------------------- */
-
-static void
-put_link (WPanel * panel)
-{
-    if (!command_prompt)
-        return;
-    if (S_ISLNK (selection (panel)->st.st_mode))
-    {
-        char buffer[MC_MAXPATHLEN];
-        vfs_path_t *vpath;
-        int i;
-
-        vpath = vfs_path_append_new (panel->cwd_vpath, selection (panel)->fname, NULL);
-        i = mc_readlink (vpath, buffer, MC_MAXPATHLEN - 1);
-        vfs_path_free (vpath);
-
-        if (i > 0)
-        {
-            buffer[i] = '\0';
-            command_insert (cmdline, buffer, TRUE);
-        }
-    }
-}
-
-/* --------------------------------------------------------------------------------------------- */
-
-static void
-put_current_link (void)
-{
-    put_link (current_panel);
-}
-
-/* --------------------------------------------------------------------------------------------- */
-
-static void
-put_other_link (void)
-{
-    if (get_other_type () == view_listing)
-        put_link (other_panel);
-}
-
-/* --------------------------------------------------------------------------------------------- */
-
 /** Insert the selected file name into the input line */
 static void
 put_prog_name (void)
@@ -803,48 +679,6 @@ put_prog_name (void)
 
     command_insert (cmdline, tmp, TRUE);
     g_free (tmp);
-}
-
-/* --------------------------------------------------------------------------------------------- */
-
-static void
-put_tagged (WPanel * panel)
-{
-    if (!command_prompt)
-        return;
-    input_disable_update (cmdline);
-    if (panel->marked)
-    {
-        int i;
-
-        for (i = 0; i < panel->dir.len; i++)
-        {
-            if (panel->dir.list[i].f.marked)
-                command_insert (cmdline, panel->dir.list[i].fname, TRUE);
-        }
-    }
-    else
-    {
-        command_insert (cmdline, panel->dir.list[panel->selected].fname, TRUE);
-    }
-    input_enable_update (cmdline);
-}
-
-/* --------------------------------------------------------------------------------------------- */
-
-static void
-put_current_tagged (void)
-{
-    put_tagged (current_panel);
-}
-
-/* --------------------------------------------------------------------------------------------- */
-
-static void
-put_other_tagged (void)
-{
-    if (get_other_type () == view_listing)
-        put_tagged (other_panel);
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -1066,14 +900,6 @@ quit_cmd_internal (int quiet)
 
 /* --------------------------------------------------------------------------------------------- */
 
-static gboolean
-quit_cmd (void)
-{
-    return quit_cmd_internal (0);
-}
-
-/* --------------------------------------------------------------------------------------------- */
-
 /**
  * Repaint the contents of the panels without frames.  To schedule panel
  * for repainting, set panel->dirty to 1.  There are many reasons why
@@ -1108,222 +934,226 @@ static cb_ret_t
 midnight_execute_cmd (Widget * sender, unsigned long command)
 {
     cb_ret_t res = MSG_HANDLED;
-    const char *event_group_name = MCEVENT_GROUP_FILEMANAGER;
+    const char *event_group_name = MCEVENT_GROUP_CORE;
     const char *event_name = NULL;
     event_return_t ret;
+    void *event_data = sender;
 
-    (void) sender;
+    ret.b = TRUE;
 
     /* stop quick search before executing any command */
-    send_message (current_panel, NULL, MSG_ACTION, CK_SearchStop, NULL);
+    mc_event_raise (MCEVENT_GROUP_FILEMANAGER, "search_stop", current_panel, NULL, NULL);
 
     switch (command)
     {
     case CK_HotListAdd:
-        add2hotlist_cmd ();
+        event_name = "hotlist_add";
         break;
     case CK_PanelListingChange:
-        change_listing_cmd ();
+        event_name = "change_listing_mode";
         break;
     case CK_ChangeMode:
-        chmod_cmd ();
+        event_name = "chmod";
         break;
     case CK_ChangeOwn:
-        chown_cmd ();
+        event_name = "chown";
         break;
     case CK_ChangeOwnAdvanced:
-        chown_advanced_cmd ();
+        event_name = "chown_advanced";
         break;
     case CK_CompareDirs:
-        compare_dirs_cmd ();
+        event_name = "compare_dirs";
         break;
     case CK_Options:
-        configure_box ();
+        event_name = "configuration_show_dialog";
         break;
 #ifdef ENABLE_VFS
     case CK_OptionsVfs:
-        configure_vfs ();
+        event_name = "configuration_vfs_show_dialog";
         break;
 #endif
     case CK_OptionsConfirm:
-        confirm_box ();
+        event_name = "configuration_confirmations_show_dialog";
         break;
     case CK_Copy:
-        copy_cmd ();
+        event_name = "copy";
         break;
     case CK_PutCurrentPath:
-        midnight_put_panel_path (current_panel);
+        event_data = current_panel;
+        event_name = "put_path_to_cmdline";
         break;
     case CK_PutCurrentLink:
-        put_current_link ();
+        event_data = current_panel;
+        event_name = "put_link_to_cmdline";
         break;
     case CK_PutCurrentTagged:
-        put_current_tagged ();
+        event_data = current_panel;
+        event_name = "put_tagged_to_cmdline";
         break;
     case CK_PutOtherPath:
-        if (get_other_type () == view_listing)
-            midnight_put_panel_path (other_panel);
+        event_data = other_panel;
+        event_name = "put_path_to_cmdline";
         break;
     case CK_PutOtherLink:
-        put_other_link ();
+        event_data = other_panel;
+        event_name = "put_link_to_cmdline";
         break;
     case CK_PutOtherTagged:
-        put_other_tagged ();
+        event_data = other_panel;
+        event_name = "put_tagged_to_cmdline";
         break;
     case CK_Delete:
-        delete_cmd ();
+        event_name = "delete";
         break;
     case CK_ScreenList:
-        dialog_switch_list ();
+        event_group_name = MCEVENT_GROUP_WIDGET_DIALOG;
+        event_name = "show_dialog_list";
         break;
 #ifdef USE_DIFF_VIEW
     case CK_CompareFiles:
-        diff_view_cmd ();
+        event_name = "run_diffviewer";
         break;
 #endif
     case CK_OptionsDisplayBits:
-        display_bits_box ();
+        event_name = "configuration_display_bits_show_dialog";
         break;
     case CK_Edit:
-        edit_cmd ();
+        event_name = "run_editor";
         break;
 #ifdef USE_INTERNAL_EDIT
     case CK_EditForceInternal:
-        edit_cmd_force_internal ();
+        event_name = "run_editor_internal";
         break;
 #endif
     case CK_EditExtensionsFile:
-        ext_cmd ();
+        event_name = "extention_rules_file_edit";
         break;
     case CK_EditFileHighlightFile:
-        edit_fhl_cmd ();
+        event_name = "file_highlight_rules_edit";
         break;
     case CK_EditUserMenu:
-        edit_mc_menu_cmd ();
+        event_name = "user_menu_edit";
         break;
     case CK_LinkSymbolicEdit:
-        edit_symlink_cmd ();
+        event_name = "symlink_edit";
         break;
     case CK_ExternalPanelize:
-        external_panelize ();
+        event_name = "external_panelize";
         break;
     case CK_Filter:
-        filter_cmd ();
+        event_name = "filter";
         break;
     case CK_ViewFiltered:
-        view_filtered_cmd ();
+        event_name = "view_filtered";
         break;
     case CK_Find:
-        find_cmd ();
+        event_name = "find_file";
         break;
 #ifdef ENABLE_VFS_FISH
     case CK_ConnectFish:
-        fishlink_cmd ();
+        event_name = "fish_connect_show_dialog";
         break;
 #endif
 #ifdef ENABLE_VFS_FTP
     case CK_ConnectFtp:
-        ftplink_cmd ();
+        event_name = "ftp_connect_show_dialog";
         break;
 #endif
 #ifdef ENABLE_VFS_SFTP
     case CK_ConnectSftp:
-        sftplink_cmd ();
+        event_name = "sftp_connect_show_dialog";
         break;
 #endif
 #ifdef ENABLE_VFS_SMB
     case CK_ConnectSmb:
-        smblink_cmd ();
+        event_name = "smb_connect_show_dialog";
         break;
 #endif /* ENABLE_VFS_SMB */
     case CK_Panelize:
-        cd_panelize_cmd ();
+        event_name = "panelize";
         break;
     case CK_Help:
-        help_cmd ();
+        event_group_name = MCEVENT_GROUP_FILEMANAGER;
+        event_name = "help";
         break;
     case CK_History:
         /* show the history of command line widget */
-        send_message (cmdline, NULL, MSG_ACTION, CK_History, NULL);
+        event_group_name = MCEVENT_GROUP_WIDGET_INPUT;
+        event_name = "show_history";
+        event_data = cmdline;
         break;
     case CK_PanelInfo:
-        if (sender == WIDGET (the_menubar))
-            info_cmd ();        /* menu */
-        else
-            info_cmd_no_menu ();        /* shortcut or buttonbar */
+        event_name = "panel_info";
         break;
-#ifdef ENABLE_BACKGROUND
     case CK_Jobs:
-        jobs_cmd ();
+        event_name = "show_background_jobs";
         break;
-#endif
     case CK_OptionsLayout:
-        layout_box ();
+        event_name = "configuration_layout_show_dialog";
         break;
     case CK_OptionsAppearance:
-        appearance_box ();
+        event_name = "configuration_appearance_show_dialog";
         break;
     case CK_LearnKeys:
-        learn_keys ();
+        event_name = "configuration_learn_keys_show_dialog";
         break;
     case CK_Link:
-        link_cmd (LINK_HARDLINK);
+        event_name = "hard_link";
         break;
     case CK_PanelListing:
-        listing_cmd ();
+        event_name = "panel_listing";
         break;
 #ifdef LISTMODE_EDITOR
     case CK_ListMode:
-        listmode_cmd ();
+        event_name = "listmode";
         break;
 #endif
     case CK_Menu:
-        menu_cmd ();
+        event_name = "menu";
         break;
     case CK_MenuLastSelected:
-        menu_last_selected_cmd ();
+        event_name = "menu_last_selected";
         break;
     case CK_MakeDir:
-        mkdir_cmd ();
+        event_name = "mkdir";
         break;
     case CK_OptionsPanel:
-        panel_options_box ();
+        event_name = "configuration_panel_show_dialog";
         break;
 #ifdef HAVE_CHARSET
     case CK_SelectCodepage:
-        encoding_cmd ();
+        event_name = "select_encoding";
         break;
 #endif
     case CK_CdQuick:
-        quick_cd_cmd ();
+        event_name = "quick_cd";
         break;
     case CK_HotList:
-        hotlist_cmd ();
+        event_name = "hotlist";
         break;
     case CK_PanelQuickView:
-        if (sender == WIDGET (the_menubar))
-            quick_view_cmd ();  /* menu */
-        else
-            quick_cmd_no_menu ();       /* shortcut or buttonabr */
+        event_name = "panel_quick_view";
         break;
     case CK_QuitQuiet:
-        quiet_quit_cmd ();
+        event_name = "quiet_quit";
         break;
     case CK_Quit:
-        quit_cmd ();
+        event_name = "quit";
         break;
     case CK_LinkSymbolicRelative:
-        link_cmd (LINK_SYMLINK_RELATIVE);
+        event_name = "sym_link_relative";
         break;
     case CK_Move:
-        rename_cmd ();
+        event_data = current_panel;
+        event_group_name = MCEVENT_GROUP_FILEMANAGER;
+        event_name = "rename";
         break;
     case CK_Reread:
-        reread_cmd ();
+        event_name = "reread";
         break;
 #ifdef ENABLE_VFS
     case CK_VfsList:
-        vfs_list ();
+        event_name = "show_vfs_list";
         break;
 #endif
     case CK_SaveSetup:
@@ -1347,16 +1177,16 @@ midnight_execute_cmd (Widget * sender, unsigned long command)
         ctl_x_cmd ();
         break;
     case CK_Suspend:
-        mc_event_raise (MCEVENT_GROUP_CORE, "suspend", NULL, NULL, NULL);
+        event_name = "suspend";
         break;
     case CK_Swap:
         swap_cmd ();
         break;
     case CK_LinkSymbolic:
-        link_cmd (LINK_SYMLINK_ABSOLUTE);
+        event_name = "sym_link_absolute";
         break;
     case CK_PanelListingSwitch:
-        toggle_listing_cmd ();
+        event_name = "panel_listing_switch";
         break;
     case CK_ShowHidden:
         toggle_show_hidden ();
@@ -1388,6 +1218,8 @@ midnight_execute_cmd (Widget * sender, unsigned long command)
         user_file_menu_cmd ();
         break;
     case CK_View:
+        event_group_name = MCEVENT_GROUP_FILEMANAGER;
+        event_data = current_panel;
         event_name = "view";
         break;
     case CK_ViewFile:
@@ -1400,7 +1232,7 @@ midnight_execute_cmd (Widget * sender, unsigned long command)
         res = MSG_NOT_HANDLED;
     }
 
-    if (mc_event_raise (event_group_name, event_name, current_panel, &ret, NULL))
+    if (mc_event_raise (event_group_name, event_name, event_data, &ret, NULL))
     {
         return (ret.b) ? MSG_HANDLED : MSG_NOT_HANDLED;
     }
@@ -1458,7 +1290,7 @@ midnight_handle_raw_keys (int parm)
     /* Ctrl-Shift-Enter */
     if (parm == (KEY_M_CTRL | KEY_M_SHIFT | '\n'))
     {
-        midnight_put_panel_path (current_panel);
+        mc_event_raise (MCEVENT_GROUP_CORE, "put_path_to_cmdline", current_panel, NULL, NULL);
         put_prog_name ();
         return MSG_HANDLED;
     }
@@ -1737,15 +1569,6 @@ save_cwds_stat (void)
 
 /* --------------------------------------------------------------------------------------------- */
 
-gboolean
-quiet_quit_cmd (void)
-{
-    print_last_revert = TRUE;
-    return quit_cmd_internal (1);
-}
-
-/* --------------------------------------------------------------------------------------------- */
-
 /** Run the main dialog that occupies the whole screen */
 gboolean
 do_nc (GError ** error)
@@ -1807,6 +1630,227 @@ do_nc (GError ** error)
         clr_scr ();
 
     return ret;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+/* event callback */
+
+gboolean
+mc_core_cmd_put_path_to_cmdline (event_info_t * event_info, gpointer data, GError ** error)
+{
+    WPanel *panel = (WPanel *) data;
+
+    vfs_path_t *cwd_vpath;
+    const char *cwd_vpath_str;
+
+    (void) error;
+    (void) event_info;
+
+    if (!command_prompt || get_panel_type (panel) != view_listing)
+        return TRUE;
+
+#ifdef HAVE_CHARSET
+    cwd_vpath = remove_encoding_from_path (panel->cwd_vpath);
+#else
+    cwd_vpath = vfs_path_clone (panel->cwd_vpath);
+#endif
+
+    cwd_vpath_str = vfs_path_as_str (cwd_vpath);
+
+    command_insert (cmdline, cwd_vpath_str, FALSE);
+
+    if (cwd_vpath_str[strlen (cwd_vpath_str) - 1] != PATH_SEP)
+        command_insert (cmdline, PATH_SEP_STR, FALSE);
+
+    vfs_path_free (cwd_vpath);
+
+    return TRUE;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+/* event callback */
+
+gboolean
+mc_core_cmd_put_link_to_cmdline (event_info_t * event_info, gpointer data, GError ** error)
+{
+    WPanel *panel = (WPanel *) data;
+
+    (void) error;
+    (void) event_info;
+
+    if (!command_prompt || get_panel_type (panel) != view_listing)
+        return TRUE;
+
+    if (S_ISLNK (selection (panel)->st.st_mode))
+    {
+        char buffer[MC_MAXPATHLEN];
+        vfs_path_t *vpath;
+        int i;
+
+        vpath = vfs_path_append_new (panel->cwd_vpath, selection (panel)->fname, NULL);
+        i = mc_readlink (vpath, buffer, MC_MAXPATHLEN - 1);
+        vfs_path_free (vpath);
+
+        if (i > 0)
+        {
+            buffer[i] = '\0';
+            command_insert (cmdline, buffer, TRUE);
+        }
+    }
+
+    return TRUE;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+/* event callback */
+
+gboolean
+mc_core_cmd_put_tagged_to_cmdline (event_info_t * event_info, gpointer data, GError ** error)
+{
+    WPanel *panel = (WPanel *) data;
+
+    (void) error;
+    (void) event_info;
+
+    if (!command_prompt || get_panel_type (panel) != view_listing)
+        return TRUE;
+
+    input_disable_update (cmdline);
+    if (panel->marked)
+    {
+        int i;
+
+        for (i = 0; i < panel->dir.len; i++)
+        {
+            if (panel->dir.list[i].f.marked)
+                command_insert (cmdline, panel->dir.list[i].fname, TRUE);
+        }
+    }
+    else
+    {
+        command_insert (cmdline, panel->dir.list[panel->selected].fname, TRUE);
+    }
+    input_enable_update (cmdline);
+
+    return TRUE;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+#ifdef LISTMODE_EDITOR
+/* event callback */
+
+gboolean
+mc_core_cmd_listmode (event_info_t * event_info, gpointer data, GError ** error)
+{
+    char *newmode;
+
+    (void) error;
+    (void) event_info;
+    (void) data;
+
+    if (get_current_type () != view_listing)
+        return TRUE;
+
+    newmode = listmode_edit (current_panel->user_format);
+    if (!newmode)
+        return TRUE;
+
+    g_free (current_panel->user_format);
+    current_panel->list_type = list_user;
+    current_panel->user_format = newmode;
+    set_panel_formats (current_panel);
+
+    do_refresh ();
+    return TRUE;
+}
+#endif /* LISTMODE_EDITOR */
+
+/* --------------------------------------------------------------------------------------------- */
+/* event callback */
+
+gboolean
+mc_core_cmd_menu (event_info_t * event_info, gpointer data, GError ** error)
+{
+    (void) error;
+    (void) event_info;
+    (void) data;
+
+    if (the_menubar->is_active)
+        return TRUE;
+
+    if ((get_current_index () == 0) == (current_panel->active != 0))
+        the_menubar->selected = 0;
+    else
+        the_menubar->selected = g_list_length (the_menubar->menu) - 1;
+
+    mc_event_raise (event_info->group_name, "menu_last_selected", NULL, event_info->ret, error);
+
+    return TRUE;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+/* event callback */
+
+gboolean
+mc_core_cmd_menu_last_selected (event_info_t * event_info, gpointer data, GError ** error)
+{
+    (void) error;
+    (void) event_info;
+    (void) data;
+
+    the_menubar->is_active = TRUE;
+    the_menubar->is_dropped = (drop_menus != 0);
+    the_menubar->previous_widget = dlg_get_current_widget_id (midnight_dlg);
+    dlg_select_widget (the_menubar);
+
+    return TRUE;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+/* event callback */
+
+gboolean
+mc_core_cmd_panel_quick_view (event_info_t * event_info, gpointer data, GError ** error)
+{
+    Widget *sender = (Widget *) data;
+
+    (void) error;
+    (void) event_info;
+
+    if (sender == WIDGET (the_menubar))
+        quick_view_cmd ();      /* menu */
+    else
+        quick_cmd_no_menu ();   /* shortcut or buttonabr */
+
+    return TRUE;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+/* event callback */
+
+gboolean
+mc_core_cmd_quiet_quit (event_info_t * event_info, gpointer data, GError ** error)
+{
+    (void) error;
+    (void) data;
+
+    print_last_revert = TRUE;
+    event_info->ret->b = quit_cmd_internal (1);
+    return TRUE;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+/* event callback */
+
+gboolean
+mc_core_cmd_quit (event_info_t * event_info, gpointer data, GError ** error)
+{
+    (void) error;
+    (void) data;
+
+    event_info->ret->b = quit_cmd_internal (0);
+
+    return TRUE;
 }
 
 /* --------------------------------------------------------------------------------------------- */

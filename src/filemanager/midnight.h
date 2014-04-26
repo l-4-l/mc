@@ -44,7 +44,6 @@ void midnight_set_buttonbar (WButtonBar * b);
 void load_hint (gboolean force);
 void change_panel (void);
 void save_cwds_stat (void);
-gboolean quiet_quit_cmd (void);
 gboolean do_nc (GError **);
 
 /*** inline functions ****************************************************************************/
