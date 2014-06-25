@@ -3235,6 +3235,9 @@ panel_execute_cmd (WPanel * panel, unsigned long command)
     case CK_Select:
         select_cmd ();
         break;
+    case CK_SelectExt:
+        select_cmd ();
+        break;
     case CK_Unselect:
         unselect_cmd ();
         break;

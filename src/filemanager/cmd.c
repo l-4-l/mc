@@ -1051,6 +1051,57 @@ select_invert_cmd (void)
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/** Select/unselect all the files like a current file by extension */
+
+void
+select_ext_cmd (void)
+{
+    gboolean do_select = !selection (current_panel)->f.marked;
+    gboolean shell_patterns = TRUE;
+    char *filename = selection (current_panel)->fname;
+    char *reg_exp;
+    const char *cur_file_ext;
+    mc_search_t *search;
+    int i;
+
+    if (filename == NULL)
+        return;
+
+    cur_file_ext = extension (filename);
+
+    if (cur_file_ext[0] != '\0')
+    {
+        reg_exp = g_strconcat ("*.", cur_file_ext, (char *) NULL);
+    }
+    else
+    {
+        shell_patterns = FALSE;
+        reg_exp = g_strdup ("^[^\\.]+$");
+    }
+
+    search = mc_search_new (reg_exp, -1, NULL);
+    search->search_type = shell_patterns ? MC_SEARCH_T_GLOB : MC_SEARCH_T_REGEX;
+    search->is_entire_line = TRUE;
+    search->is_case_sensitive = FALSE;
+
+    for (i = 0; i < current_panel->dir.len; i++)
+    {
+        if (DIR_IS_DOTDOT (current_panel->dir.list[i].fname))
+            continue;
+        if (S_ISDIR (current_panel->dir.list[i].st.st_mode))
+            continue;
+
+        if (mc_search_run (search, current_panel->dir.list[i].fname,
+                           0, current_panel->dir.list[i].fnamelen, NULL))
+            do_file_mark (current_panel, i, do_select);
+    }
+
+    mc_search_free (search);
+    g_free (reg_exp);
+
+}
+
+/* --------------------------------------------------------------------------------------------- */
 
 void
 select_cmd (void)

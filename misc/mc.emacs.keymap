@@ -35,6 +35,7 @@ PutOtherPath = alt-shift-a
 ViewFiltered = alt-exclamation
 Select = kpplus
 Unselect = kpminus
+# SelectExt =
 SelectInvert = kpasterisk
 ScreenList = alt-prime
 # OptionsLayout =

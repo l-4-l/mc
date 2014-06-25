@@ -88,6 +88,7 @@ void edit_symlink_cmd (void);
 void select_invert_cmd (void);
 void unselect_cmd (void);
 void select_cmd (void);
+void select_ext_cmd (void);
 void swap_cmd (void);
 void view_other_cmd (void);
 void quick_cd_cmd (void);
