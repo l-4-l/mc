@@ -111,8 +111,7 @@ mcview_growbuf_filesize (mcview_t * view)
 void
 mcview_growbuf_read_until (mcview_t * view, off_t ofs)
 {
-    ssize_t nread;
-    gboolean short_read;
+    gboolean short_read = FALSE;
 
 #ifdef HAVE_ASSERT_H
     assert (view->growbuf_in_use);
@@ -121,11 +120,12 @@ mcview_growbuf_read_until (mcview_t * view, off_t ofs)
     if (view->growbuf_finished)
         return;
 
-    short_read = FALSE;
     while (mcview_growbuf_filesize (view) < ofs || short_read)
     {
+        ssize_t nread = 0;
         byte *p;
         size_t bytesfree;
+        GError *error = NULL;
 
         if (view->growbuf_lastindex == VIEW_PAGE_SIZE)
         {
@@ -144,14 +144,38 @@ mcview_growbuf_read_until (mcview_t * view, off_t ofs)
 
         if (view->datasource == DS_STDIO_PIPE)
         {
-            nread = fread (p, 1, bytesfree, view->ds_stdio_pipe);
-            if (nread == 0)
+            mc_pipe_t *sp = view->ds_stdio_pipe;
+
+            if (bytesfree > MC_PIPE_BUFSIZE)
+                bytesfree = MC_PIPE_BUFSIZE;
+
+            sp->out.len = bytesfree;
+            mc_pread (sp, &error);
+
+            if (error != NULL)
+            {
+                mcview_show_error (view, error->message);
+                g_error_free (error);
+            }
+
+            if (sp->err.len > 0)
+            {
+                mcview_show_error (view, sp->err.buf);
+                /* ignore possible following errors */
+                sp->err.len = MC_PIPE_STREAM_DROPPED;
+            }
+
+            if (sp->out.len > 0)
+            {
+                memmove (p, sp->out.buf, sp->out.len);
+                nread = sp->out.len;
+            }
+            else if (sp->out.len == MC_PIPE_STREAM_EOF || sp->out.len == MC_PIPE_STREAM_ERROR)
             {
                 view->growbuf_finished = TRUE;
-                (void) pclose (view->ds_stdio_pipe);
-                mcview_display (view);
-                close_error_pipe (D_NORMAL, NULL);
+                mc_pclose (view->ds_stdio_pipe, NULL);
                 view->ds_stdio_pipe = NULL;
+                mcview_display (view);
                 return;
             }
         }

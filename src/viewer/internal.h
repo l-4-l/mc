@@ -100,7 +100,7 @@ struct mcview_struct
     enum view_ds datasource;    /* Where the displayed data comes from */
 
     /* stdio pipe data source */
-    FILE *ds_stdio_pipe;        /* Output of a shell command */
+    mc_pipe_t *ds_stdio_pipe;   /* Output of a shell command */
 
     /* vfs pipe data source */
     int ds_vfs_pipe;            /* Non-seekable vfs file descriptor */
