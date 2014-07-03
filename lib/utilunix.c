@@ -50,6 +50,9 @@
 #endif
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifdef HAVE_SYS_SELECT_H
+#include <sys/select.h>
+#endif
 #include <sys/wait.h>
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
@@ -230,6 +233,55 @@ my_system_make_arg_array (int flags, const char *shell, char **execute_name)
         g_ptr_array_add (args_array, g_strdup (shell));
     }
     return args_array;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+static void
+mc_pread_stream (mc_pipe_stream_t * ps, const fd_set * fds)
+{
+    char *dummy[MC_PIPE_BUFSIZE];
+    ssize_t dummy_len = MC_PIPE_BUFSIZE;
+    char *buf;
+    ssize_t *buf_len;
+    gboolean null_term;
+
+    if (ps->len == 0 || !FD_ISSET (ps->fd, fds))
+    {
+        ps->len = MC_PIPE_STREAM_UNREAD;
+        return;
+    }
+
+    if (ps->len < 0)
+    {
+        buf = (char *) dummy;
+        buf_len = &dummy_len;
+        null_term = FALSE;
+    }
+    else
+    {
+        buf = (char *) ps->buf;
+        buf_len = &ps->len;
+        null_term = ps->null_term;
+    }
+
+    if (*buf_len >= MC_PIPE_BUFSIZE)
+        *buf_len = null_term ? MC_PIPE_BUFSIZE - 1 : MC_PIPE_BUFSIZE;
+
+    do
+    {
+        *buf_len = read (ps->fd, buf, (size_t) (*buf_len));
+    }
+    while (*buf_len < 0 && errno == EINTR);
+
+    if (*buf_len == 0)
+        /* EOF */
+        ps->len = MC_PIPE_STREAM_EOF;
+    else if (*buf_len < 0)
+        /* reading error */
+        ps->len = MC_PIPE_STREAM_ERROR;
+    else if (ps->null_term)
+        buf[*buf_len] = '\0';
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -448,6 +500,183 @@ my_systemv_flags (int flags, const char *command, char *const argv[])
     g_ptr_array_free (args_array, TRUE);
 
     return status;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+/**
+ * Create pipe and run child process.
+ *
+ * @parameter command command line of child process
+ * @paremeter error contains pointer to object to handle error code and message
+ *
+ * @return newly created object of mc_pipe_t class in success, NULL otherwise
+ */
+
+mc_pipe_t *
+mc_popen (const char *command, GError ** error)
+{
+    mc_pipe_t *p;
+    char **argv;
+
+    p = g_try_new (mc_pipe_t, 1);
+    if (p == NULL)
+    {
+        if (error != NULL)
+            g_propagate_error (error,
+                               g_error_new (MC_ERROR, 1, "%s", _("Cannot create pipe descriptor")));
+        return NULL;
+    }
+
+    if (!g_shell_parse_argv (command, NULL, &argv, error))
+    {
+        if (error != NULL)
+            g_propagate_error (error,
+                               g_error_new (MC_ERROR, 1, "%s", _("Cannot parse command for pipe")));
+        goto ret_err;
+    }
+
+    if (!g_spawn_async_with_pipes (NULL, argv, NULL, G_SPAWN_DO_NOT_REAP_CHILD, NULL, NULL,
+                                   &p->child_pid, NULL, &p->out.fd, &p->err.fd, error))
+    {
+        if (error != NULL)
+            g_propagate_error (error, g_error_new (MC_ERROR, 1, "%s", _("Cannot create pipe")));
+        goto ret_err;
+    }
+
+    g_strfreev (argv);
+
+    p->out.buf[0] = '\0';
+    p->out.len = MC_PIPE_BUFSIZE;
+    p->out.null_term = FALSE;
+
+    p->err.buf[0] = '\0';
+    p->err.len = MC_PIPE_BUFSIZE;
+    p->err.null_term = FALSE;
+
+    return p;
+
+  ret_err:
+    g_free (p);
+    return NULL;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+/**
+ * Read stdout and stderr of pipe asynchronously.
+ *
+ * @parameter p pipe descriptor
+ *
+ * The lengths of read data contain in p->out.len and p->err.len.
+ * If p->xxx.len is positive, stream p->xxx is actually read and data in stored p->xxx.buf.
+ * If p->xxx.len is zero, stream is not read.
+ * If p->xxx.len is negative, stream is read, but data is dropped.
+ *
+ * After read, p->xxx.len contains the following:
+ *   positive: the actual length of read data stored in p->xxx.buf;
+ *   MC_PIPE_STREAM_EOF - EOF;
+ *   MC_PIPE_STREAM_ERROR - read error. In this case errno is set appropriately;
+ *   MC_PIPE_STREAM_UNREAD - stream was not read (p->xxx.len was zero before reading), p->xxx.buf is uncnahged;
+ *   MC_PIPE_STREAM_DROPPED - stream was read (p->xxx.len was negative before reading), but data was dropped
+ *                            and p->xxx.buf is uncnahged.
+ *
+ * @paremeter error contains pointer to object to handle error code and message
+ */
+
+void
+mc_pread (mc_pipe_t * p, GError ** error)
+{
+    gboolean read_out, read_err;
+    fd_set fds;
+    int res;
+
+    if (error != NULL)
+        *error = NULL;
+
+    read_out = p->out.fd >= 0 && p->out.len != 0;
+    read_err = p->err.fd >= 0 && p->err.len != 0;
+
+    if (!read_out && !read_err)
+    {
+        p->out.len = MC_PIPE_STREAM_UNREAD;
+        p->err.len = MC_PIPE_STREAM_UNREAD;
+        return;
+    }
+
+    FD_ZERO (&fds);
+    if (read_out)
+        FD_SET (p->out.fd, &fds);
+    if (read_err)
+        FD_SET (p->err.fd, &fds);
+
+    /* no timeout */
+    res = select (max (p->out.fd, p->err.fd) + 1, &fds, NULL, NULL, NULL);
+    if (res < 0 && errno != EINTR)
+    {
+        if (error != NULL)
+            g_propagate_error (error,
+                               g_error_new (MC_ERROR, G_SPAWN_ERROR_READ,
+                                            _
+                                            ("Unexpected error in select() reading data from a child process:\n%s"),
+                                            unix_error_string (errno)));
+        return;
+    }
+
+    if (read_out)
+    {
+        mc_pread_stream (&p->out, &fds);
+
+        if (p->out.len == MC_PIPE_STREAM_ERROR && error != NULL)
+            g_propagate_error (error,
+                               g_error_new (MC_ERROR, G_SPAWN_ERROR_READ,
+                                            _("Failed to read data from child stdout:\n%s"),
+                                            unix_error_string (errno)));
+    }
+
+    if (read_err)
+    {
+        mc_pread_stream (&p->err, &fds);
+
+        if (p->err.len == MC_PIPE_STREAM_ERROR && error != NULL)
+            g_propagate_error (error,
+                               g_error_new (MC_ERROR, G_SPAWN_ERROR_READ,
+                                            _("Failed to read data from child stderr:\n%s"),
+                                            unix_error_string (errno)));
+    }
+}
+
+/* --------------------------------------------------------------------------------------------- */
+/**
+ * Close pipe and destroy pipe descriptor.
+ *
+ * @paremeter p pipe descriptor
+ * @paremeter error contains pointer to object to handle error code and message
+ */
+
+void
+mc_pclose (mc_pipe_t * p, GError ** error)
+{
+    int res;
+
+    if (p->out.fd >= 0)
+        res = close (p->out.fd);
+    if (p->err.fd >= 0)
+        res = close (p->err.fd);
+
+    do
+    {
+        int status;
+
+        res = waitpid (p->child_pid, &status, 0);
+    }
+    while (res < 0 && errno == EINTR);
+
+    if (res < 0 && error != NULL)
+        g_propagate_error (error,
+                           g_error_new (MC_ERROR, G_SPAWN_ERROR_READ,
+                                        _("Unexpected error in waitpid():\n%s"),
+                                        unix_error_string (errno)));
+
+    g_free (p);
 }
 
 /* --------------------------------------------------------------------------------------------- */
