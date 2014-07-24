@@ -241,9 +241,11 @@ static void
 mc_pread_stream (mc_pipe_stream_t * ps, const fd_set * fds)
 {
     char *dummy[MC_PIPE_BUFSIZE];
-    ssize_t dummy_len = MC_PIPE_BUFSIZE;
+    size_t dummy_len = MC_PIPE_BUFSIZE;
     char *buf;
-    ssize_t *buf_len;
+    size_t buf_len;
+    ssize_t read_len;
+    gboolean drop;
     gboolean null_term;
 
     if (ps->len == 0 || !FD_ISSET (ps->fd, fds))
@@ -252,36 +254,44 @@ mc_pread_stream (mc_pipe_stream_t * ps, const fd_set * fds)
         return;
     }
 
-    if (ps->len < 0)
+    drop = (ps->len < 0);
+
+    if (drop)
     {
         buf = (char *) dummy;
-        buf_len = &dummy_len;
+        buf_len = dummy_len;
         null_term = FALSE;
     }
     else
     {
         buf = (char *) ps->buf;
-        buf_len = &ps->len;
+        buf_len = (size_t) ps->len;
         null_term = ps->null_term;
     }
 
-    if (*buf_len >= MC_PIPE_BUFSIZE)
-        *buf_len = null_term ? MC_PIPE_BUFSIZE - 1 : MC_PIPE_BUFSIZE;
+    if (buf_len >= MC_PIPE_BUFSIZE)
+        buf_len = null_term ? MC_PIPE_BUFSIZE - 1 : MC_PIPE_BUFSIZE;
 
     do
     {
-        *buf_len = read (ps->fd, buf, (size_t) (*buf_len));
+        read_len = read (ps->fd, buf, buf_len);
     }
-    while (*buf_len < 0 && errno == EINTR);
+    while (read_len < 0 && errno == EINTR);
 
-    if (*buf_len == 0)
+    if (read_len < 0)
+        /* reading error */
+        ps->len = MC_PIPE_ERROR_READ;
+    else if (read_len == 0)
         /* EOF */
         ps->len = MC_PIPE_STREAM_EOF;
-    else if (*buf_len < 0)
-        /* reading error */
-        ps->len = MC_PIPE_STREAM_ERROR;
-    else if (ps->null_term)
-        buf[*buf_len] = '\0';
+    else if (!drop)
+    {
+        /* success */
+        ps->len = read_len;
+
+        if (ps->null_term)
+            ps->buf[(size_t) read_len] = '\0';
+    }
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -521,25 +531,23 @@ mc_popen (const char *command, GError ** error)
     p = g_try_new (mc_pipe_t, 1);
     if (p == NULL)
     {
-        if (error != NULL)
-            g_propagate_error (error,
-                               g_error_new (MC_ERROR, 1, "%s", _("Cannot create pipe descriptor")));
-        return NULL;
+        mc_replace_error (error, MC_PIPE_ERROR_CREATE_PIPE, "%s",
+                          _("Cannot create pipe descriptor"));
+        goto ret_err;
     }
 
     if (!g_shell_parse_argv (command, NULL, &argv, error))
     {
-        if (error != NULL)
-            g_propagate_error (error,
-                               g_error_new (MC_ERROR, 1, "%s", _("Cannot parse command for pipe")));
+        mc_replace_error (error, MC_PIPE_ERROR_PARSE_COMMAND, "%s",
+                          _("Cannot parse command for pipe"));
         goto ret_err;
     }
 
     if (!g_spawn_async_with_pipes (NULL, argv, NULL, G_SPAWN_DO_NOT_REAP_CHILD, NULL, NULL,
                                    &p->child_pid, NULL, &p->out.fd, &p->err.fd, error))
     {
-        if (error != NULL)
-            g_propagate_error (error, g_error_new (MC_ERROR, 1, "%s", _("Cannot create pipe")));
+        mc_replace_error (error, MC_PIPE_ERROR_CREATE_PIPE_STREAM, "%s",
+                          _("Cannot create pipe streams"));
         goto ret_err;
     }
 
@@ -612,12 +620,10 @@ mc_pread (mc_pipe_t * p, GError ** error)
     res = select (max (p->out.fd, p->err.fd) + 1, &fds, NULL, NULL, NULL);
     if (res < 0 && errno != EINTR)
     {
-        if (error != NULL)
-            g_propagate_error (error,
-                               g_error_new (MC_ERROR, G_SPAWN_ERROR_READ,
-                                            _
-                                            ("Unexpected error in select() reading data from a child process:\n%s"),
-                                            unix_error_string (errno)));
+        mc_propagate_error (error, MC_PIPE_ERROR_READ,
+                            _
+                            ("Unexpected error in select() reading data from a child process:\n%s"),
+                            unix_error_string (errno));
         return;
     }
 
@@ -625,22 +631,20 @@ mc_pread (mc_pipe_t * p, GError ** error)
     {
         mc_pread_stream (&p->out, &fds);
 
-        if (p->out.len == MC_PIPE_STREAM_ERROR && error != NULL)
-            g_propagate_error (error,
-                               g_error_new (MC_ERROR, G_SPAWN_ERROR_READ,
-                                            _("Failed to read data from child stdout:\n%s"),
-                                            unix_error_string (errno)));
+        if (p->out.len == MC_PIPE_ERROR_READ)
+            mc_replace_error (error, MC_PIPE_ERROR_READ,
+                              _("Failed to read data from child stdout:\n%s"),
+                              unix_error_string (errno));
     }
 
     if (read_err)
     {
         mc_pread_stream (&p->err, &fds);
 
-        if (p->err.len == MC_PIPE_STREAM_ERROR && error != NULL)
-            g_propagate_error (error,
-                               g_error_new (MC_ERROR, G_SPAWN_ERROR_READ,
-                                            _("Failed to read data from child stderr:\n%s"),
-                                            unix_error_string (errno)));
+        if (p->err.len == MC_PIPE_ERROR_READ)
+            mc_replace_error (error, MC_PIPE_ERROR_READ,
+                              _("Failed to read data from child stderr:\n%s"),
+                              unix_error_string (errno));
     }
 }
 
@@ -670,11 +674,9 @@ mc_pclose (mc_pipe_t * p, GError ** error)
     }
     while (res < 0 && errno == EINTR);
 
-    if (res < 0 && error != NULL)
-        g_propagate_error (error,
-                           g_error_new (MC_ERROR, G_SPAWN_ERROR_READ,
-                                        _("Unexpected error in waitpid():\n%s"),
-                                        unix_error_string (errno)));
+    if (res < 0)
+        mc_replace_error (error, MC_PIPE_ERROR_READ, _("Unexpected error in waitpid():\n%s"),
+                          unix_error_string (errno));
 
     g_free (p);
 }

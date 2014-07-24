@@ -29,9 +29,12 @@
 
 #define MC_PIPE_BUFSIZE BUF_8K
 #define MC_PIPE_STREAM_EOF 0
-#define MC_PIPE_STREAM_ERROR -1
-#define MC_PIPE_STREAM_UNREAD -2
-#define MC_PIPE_STREAM_DROPPED -3
+#define MC_PIPE_STREAM_UNREAD -1
+#define MC_PIPE_STREAM_DROPPED -2
+#define MC_PIPE_ERROR_CREATE_PIPE -3
+#define MC_PIPE_ERROR_PARSE_COMMAND -4
+#define MC_PIPE_ERROR_CREATE_PIPE_STREAM -5
+#define MC_PIPE_ERROR_READ -6
 
 /*** enums ***************************************************************************************/
 
