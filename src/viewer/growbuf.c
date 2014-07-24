@@ -125,7 +125,6 @@ mcview_growbuf_read_until (mcview_t * view, off_t ofs)
         ssize_t nread = 0;
         byte *p;
         size_t bytesfree;
-        GError *error = NULL;
 
         if (view->growbuf_lastindex == VIEW_PAGE_SIZE)
         {
@@ -145,6 +144,7 @@ mcview_growbuf_read_until (mcview_t * view, off_t ofs)
         if (view->datasource == DS_STDIO_PIPE)
         {
             mc_pipe_t *sp = view->ds_stdio_pipe;
+            GError *error = NULL;
 
             if (bytesfree > MC_PIPE_BUFSIZE)
                 bytesfree = MC_PIPE_BUFSIZE;
@@ -170,7 +170,7 @@ mcview_growbuf_read_until (mcview_t * view, off_t ofs)
                 memmove (p, sp->out.buf, sp->out.len);
                 nread = sp->out.len;
             }
-            else if (sp->out.len == MC_PIPE_STREAM_EOF || sp->out.len == MC_PIPE_STREAM_ERROR)
+            else if (sp->out.len == MC_PIPE_STREAM_EOF || sp->out.len == MC_PIPE_ERROR_READ)
             {
                 view->growbuf_finished = TRUE;
                 mc_pclose (view->ds_stdio_pipe, NULL);
