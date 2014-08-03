@@ -944,6 +944,10 @@ input_event (Gpm_Event * event, void *data)
     if (in->mark < 0 && (event->type & GPM_DRAG) != 0)
         in->mark = prev_point;
 
+    /* don't create highlight region of 0 length */
+    if (in->mark == in->point)
+        input_mark_cmd (in, FALSE);
+
     return MOU_NORMAL;
 }
 
