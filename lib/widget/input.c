@@ -932,12 +932,10 @@ input_event (Gpm_Event * event, void *data)
             else
                 in->point = str_length (in->buffer);
 
-            /* save point for the possible following DRAG action */
+            /* save point for the possible following GPM_DRAG action */
             if ((event->type & GPM_DOWN) != 0)
                 prev_point = in->point;
         }
-
-        input_update (in, TRUE);
     }
 
     /* start point: set marker using point before first GPM_DRAG action */
@@ -947,6 +945,9 @@ input_event (Gpm_Event * event, void *data)
     /* don't create highlight region of 0 length */
     if (in->mark == in->point)
         input_mark_cmd (in, FALSE);
+
+    if ((event->type & (GPM_DOWN | GPM_DRAG)) != 0)
+        input_update (in, TRUE);
 
     return MOU_NORMAL;
 }
