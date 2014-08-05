@@ -2516,8 +2516,8 @@ edit_replace_cmd (WEdit * edit, int again)
 
     if (edit == NULL)
     {
-        g_free (saved1), saved1 = NULL;
-        g_free (saved2), saved2 = NULL;
+        MC_PTR_FREE (saved1);
+        MC_PTR_FREE (saved2);
         return;
     }
 

@@ -887,8 +887,7 @@ ftpfs_open_socket (struct vfs_class *me, struct vfs_s_super *super)
         }
 
         vfs_print_message (_("ftpfs: making connection to %s"), host);
-        g_free (host);
-        host = NULL;
+        MC_PTR_FREE (host);
 
         if (connect (my_socket, curr_res->ai_addr, curr_res->ai_addrlen) >= 0)
             break;

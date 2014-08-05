@@ -1251,8 +1251,7 @@ do_search (WDialog * h)
             mc_closedir (dirp);
             dirp = NULL;
         }
-        g_free (directory);
-        directory = NULL;
+        MC_PTR_FREE (directory);
         dp = NULL;
         return 1;
     }
@@ -1386,8 +1385,7 @@ do_search (WDialog * h)
 static void
 init_find_vars (void)
 {
-    g_free (old_dir);
-    old_dir = NULL;
+    MC_PTR_FREE (old_dir);
     matches = 0;
     ignore_count = 0;
 
@@ -1813,8 +1811,7 @@ do_find (const char *start_dir, ssize_t start_dir_len, const char *ignore_dirs,
     g_free (content_pattern);
     kill_gui ();
     do_search (NULL);           /* force do_search to release resources */
-    g_free (old_dir);
-    old_dir = NULL;
+    MC_PTR_FREE (old_dir);
     rotate_dash (FALSE);
 
     return return_value;
