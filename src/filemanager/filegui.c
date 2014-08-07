@@ -170,6 +170,7 @@ statfs (char const *filename, struct fs_info *buf)
 /*** global variables ****************************************************************************/
 
 int classic_progressbar = 1;
+int speedchart_progress = 1;
 
 /*** file scope macro definitions ****************************************************************/
 
@@ -225,6 +226,7 @@ typedef struct
     WLabel *tgt_file_label;
     WLabel *tgt_file;
 
+    WSpeedChart *progress_file_speedchart;
     WGauge *progress_file_gauge;
     WLabel *progress_file_label;
 
@@ -758,11 +760,20 @@ file_op_context_create_ui (file_op_context_t * ctx, gboolean with_eta,
         ui->tgt_file = label_new (y++, x, "");
         add_widget (ui->op_dlg, ui->tgt_file);
 
-        ui->progress_file_gauge = gauge_new (y++, x + 3, dlg_width - (x + 3) * 2, FALSE, 100, 0);
-        if (!classic_progressbar && (current_panel == right_panel))
-            ui->progress_file_gauge->from_left_to_right = FALSE;
-        add_widget_autopos (ui->op_dlg, ui->progress_file_gauge, WPOS_KEEP_TOP | WPOS_KEEP_HORZ,
-                            NULL);
+        if (!speedchart_progress) {
+        	ui->progress_file_gauge = gauge_new (y++, x + 3, dlg_width - (x + 3) * 2,
+        			FALSE, 100, 0);
+        	if (!classic_progressbar && (current_panel == right_panel))
+        		ui->progress_file_gauge->from_left_to_right = FALSE;
+            add_widget_autopos (ui->op_dlg, ui->progress_file_gauge,
+            		WPOS_KEEP_TOP | WPOS_KEEP_HORZ, NULL);
+        } else {
+            ui->progress_file_speedchart = speedchart_new (y++, x + 1, dlg_width - (x + 1) * 2,
+            		FALSE, 100, 0);
+            y += 5;
+            add_widget_autopos (ui->op_dlg, ui->progress_file_speedchart, WPOS_KEEP_ALL, NULL);
+        }
+
 
         ui->progress_file_label = label_new (y++, x, "");
         add_widget (ui->op_dlg, ui->progress_file_label);
@@ -886,12 +897,20 @@ file_progress_show (file_op_context_t * ctx, off_t done, off_t total,
 
     if (total == 0)
     {
-        gauge_show (ui->progress_file_gauge, 0);
+    	if (!speedchart_progress)
+    		gauge_show (ui->progress_file_gauge, 0);
+    	else
+    		speedchart_show(ui->progress_file_speedchart, 0);
         return;
     }
 
-    gauge_set_value (ui->progress_file_gauge, 1024, (int) (1024 * done / total));
-    gauge_show (ui->progress_file_gauge, 1);
+    if (!speedchart_progress) {
+    	gauge_set_value (ui->progress_file_gauge, 1024, (int) (1024 * done / total));
+    	gauge_show (ui->progress_file_gauge, 1);
+    } else {
+    	speedchart_set_value (ui->progress_file_speedchart, 1024, (int) (1024 * done / total));
+    	speedchart_show (ui->progress_file_speedchart, 1);
+    }
 
     if (!force_update)
         return;

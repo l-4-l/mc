@@ -23,6 +23,7 @@ typedef struct WDialog WDialog;
 #include "lib/widget/check.h"
 #include "lib/widget/hline.h"
 #include "lib/widget/gauge.h"
+#include "lib/widget/speedchart.h"
 #include "lib/widget/groupbox.h"
 #include "lib/widget/label.h"
 #include "lib/widget/listbox.h"
