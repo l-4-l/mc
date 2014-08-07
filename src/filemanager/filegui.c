@@ -900,7 +900,7 @@ file_progress_show (file_op_context_t * ctx, off_t done, off_t total,
     	if (!speedchart_progress)
     		gauge_show (ui->progress_file_gauge, 0);
     	else
-    		speedchart_show(ui->progress_file_speedchart, 0);
+    		speedchart_show(ui->progress_file_speedchart, 0); //ctx->bps
         return;
     }
 
