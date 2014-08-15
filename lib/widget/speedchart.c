@@ -4,7 +4,7 @@
    Copyright (C) 1994-2014
    Free Software Foundation, Inc.
 
-   Authors:
+   Authors: Andrey Bachmaga
 
    This file is part of the Midnight Commander.
 
@@ -95,8 +95,6 @@ speedchart_callback (Widget * w, Widget * sender, widget_msg_t msg, int parm, vo
             percentage = done / total; //(200 * done / total + 1) / 2;
             columns = gauge_len * done / total; // (2 * gauge_len * done / total + 1) / 2;
             //tty_print_char ('[');
-            if (g->from_left_to_right)
-            {
                 tty_setcolor (GAUGE_COLOR);
                 //tty_printf ("%*s", (int) columns, "");
 
@@ -109,16 +107,6 @@ speedchart_callback (Widget * w, Widget * sender, widget_msg_t msg, int parm, vo
 
                 tty_setcolor (h->color[DLG_COLOR_NORMAL]);
                 tty_printf ("%*s", gauge_len - columns, ""); //tty_printf ("%*s] %3d%%", gauge_len - columns, "", percentage);
-            }
-            else
-            {
-                tty_setcolor (h->color[DLG_COLOR_NORMAL]);
-                tty_printf ("%*s", gauge_len - columns, "");
-                tty_setcolor (GAUGE_COLOR);
-                tty_printf ("%*s", columns, "");
-                tty_setcolor (h->color[DLG_COLOR_NORMAL]);
-                tty_printf ("] %3d%%", 100 * columns / gauge_len, percentage);
-            }
         }
         return MSG_HANDLED;
 
@@ -134,7 +122,7 @@ speedchart_callback (Widget * w, Widget * sender, widget_msg_t msg, int parm, vo
 WSpeedChart *
 speedchart_new (int y, int x, int cols, gboolean shown, int max, int current)
 {
-	WSpeedChart *g;
+    WSpeedChart *g;
     Widget *w;
 
     g = g_new (WSpeedChart, 1);
@@ -148,7 +136,6 @@ speedchart_new (int y, int x, int cols, gboolean shown, int max, int current)
         max = 1;                /* I do not like division by zero :) */
     g->max = max;
     g->current = current;
-    g->from_left_to_right = TRUE;
 
     return g;
 }
