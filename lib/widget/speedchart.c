@@ -90,23 +90,26 @@ speedchart_callback (Widget * w, Widget * sender, widget_msg_t msg, int parm, vo
                 done /= 256;
             }
 
-            gauge_len = w->cols; // - 7;    /* 7 positions for percentage */
+            gauge_len = w->cols;
 
-            percentage = done / total; //(200 * done / total + 1) / 2;
+            percentage = done / total;
             columns = gauge_len * done / total; // (2 * gauge_len * done / total + 1) / 2;
-            //tty_print_char ('[');
-                tty_setcolor (GAUGE_COLOR);
-                //tty_printf ("%*s", (int) columns, "");
 
-                s1 = (char *)malloc(columns + 1);
+            // drawing lines from down to up
+            tty_setcolor (GAUGE_COLOR);
+            //tty_printf ("%*s", (int) columns, "");
+            s1 = (char *)malloc(w->cols + 1);
+            for (int r = g->rows; r > 0; r--) {
                 for (int i = 0; i < columns; i++)
-                	s1[i] = 'X';
+                    s1[i] = 'X';
                 s1[columns] = 0;
                 tty_print_string(s1);
-                free(s1);
+            }
 
-                tty_setcolor (h->color[DLG_COLOR_NORMAL]);
-                tty_printf ("%*s", gauge_len - columns, ""); //tty_printf ("%*s] %3d%%", gauge_len - columns, "", percentage);
+            free(s1);
+
+            tty_setcolor (h->color[DLG_COLOR_NORMAL]);
+            tty_printf ("%*s", gauge_len - columns, "");
         }
         return MSG_HANDLED;
 
