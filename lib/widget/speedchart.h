@@ -21,7 +21,7 @@ typedef struct WSpeedChart
     int max;
     int current;
     long *speeds;
-    gboolean from_left_to_right;
+    //gboolean from_left_to_right;
 } WSpeedChart;
 
 /*** global variables defined in .c file *********************************************************/
