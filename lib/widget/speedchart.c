@@ -46,6 +46,7 @@
 
 /*** file scope variables ************************************************************************/
 char *s1;
+int *col_speeds;
 /*** file scope functions ************************************************************************/
 
 static cb_ret_t
@@ -72,7 +73,6 @@ speedchart_callback (Widget * w, Widget * sender, widget_msg_t msg, int parm, vo
         }
         else
         {
-            int gauge_len;
             int percentage, columns;
             long total = g->max;
             long done = g->current;
@@ -90,26 +90,28 @@ speedchart_callback (Widget * w, Widget * sender, widget_msg_t msg, int parm, vo
                 done /= 256;
             }
 
-            gauge_len = w->cols;
 
             percentage = done / total;
-            columns = gauge_len * done / total; // (2 * gauge_len * done / total + 1) / 2;
+            columns = w->cols * done / total; // (2 * gauge_len * done / total + 1) / 2;
+            cols_speed = (int*)malloc(columns);
 
-            // drawing lines from down to up
+            // drawing lines from up to down
             tty_setcolor (GAUGE_COLOR);
-            //tty_printf ("%*s", (int) columns, "");
+            
             s1 = (char *)malloc(w->cols + 1);
-            for (int r = g->rows; r > 0; r--) {
+            for (int r = 0; r < g->rows; r++) {
                 for (int i = 0; i < columns; i++)
                     s1[i] = 'X';
                 s1[columns] = 0;
                 tty_print_string(s1);
             }
+            tty_printf ("%*s", (int) columns, "");
 
             free(s1);
 
             tty_setcolor (h->color[DLG_COLOR_NORMAL]);
-            tty_printf ("%*s", gauge_len - columns, "");
+            tty_printf ("%*s", w->cols - columns, "");
+            free(cols_speed);
         }
         return MSG_HANDLED;
 
@@ -146,7 +148,7 @@ speedchart_new (int y, int x, int cols, gboolean shown, int max, int current)
 /* --------------------------------------------------------------------------------------------- */
 
 void
-speedchart_set_value (WSpeedChart * g, int max, int current)
+speedchart_set_value (WSpeedChart * g, int max, int current) //TODO: add bps here
 {
     if (g->current == current && g->max == max)
         return;                 /* Do not flicker */
