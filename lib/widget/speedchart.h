@@ -20,7 +20,7 @@ typedef struct WSpeedChart
     gboolean shown;
     int max;
     int current;
-    long *speeds;
+    long speeds[1024];
     long speeds_max;
     long speeds_min;
     int speeds_size;
