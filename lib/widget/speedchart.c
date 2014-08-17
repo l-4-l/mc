@@ -95,15 +95,32 @@ speedchart_callback (Widget * w, Widget * sender, widget_msg_t msg, int parm, vo
             columns = w->cols * done / total; // (2 * gauge_len * done / total + 1) / 2;
             cols_speed = (int*)malloc(columns);
 
+            // TODO: fill cols_speed with calculated values
+
+
+
+
+            int smax = cols_speed[0], smin = smax;
+            for (int i = 1; i < columns; i++) {
+                if (smax < cols_speed[i])
+                    smax = cols_speed[i];
+                if (smin > cols_speed[i])
+                    smin = cols_speed[i];
+            }
+
             // drawing lines from up to down
             tty_setcolor (GAUGE_COLOR);
             
             s1 = (char *)malloc(w->cols + 1);
             for (int r = 0; r < g->rows; r++) {
                 for (int i = 0; i < columns; i++)
-                    s1[i] = 'X';
+                    if (cols_speed[i] >= r)
+                        s1[i] = 'X';
+                    else
+                        s1[i] = ' ';
                 s1[columns] = 0;
                 tty_print_string(s1);
+                // todo: put lf here
             }
             tty_printf ("%*s", (int) columns, "");
 
