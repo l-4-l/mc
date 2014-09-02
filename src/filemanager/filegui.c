@@ -769,7 +769,7 @@ file_op_context_create_ui (file_op_context_t * ctx, gboolean with_eta,
             		WPOS_KEEP_TOP | WPOS_KEEP_HORZ, NULL);
         } else {
             ui->progress_file_speedchart = speedchart_new (y++, x + 1, dlg_width - (x + 1) * 2,
-            		FALSE, 100, 0);
+            		FALSE, 100, 0, 5);
             y += 5;
             add_widget_autopos (ui->op_dlg, ui->progress_file_speedchart, WPOS_KEEP_ALL, NULL);
         }

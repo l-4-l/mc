@@ -69,7 +69,10 @@ speedchart_callback (Widget * w, Widget * sender, widget_msg_t msg, int parm, vo
         if (!g->shown)
         {
             tty_setcolor (h->color[DLG_COLOR_NORMAL]);
-            tty_printf ("%*s", w->cols, "");
+            for (int i = 0; i < g->height; i++) {
+            	widget_move (w, i, 0);
+            	tty_printf ("%*s", w->cols, "");
+            }
         }
         else
         {
@@ -142,7 +145,7 @@ speedchart_callback (Widget * w, Widget * sender, widget_msg_t msg, int parm, vo
 /* --------------------------------------------------------------------------------------------- */
 
 WSpeedChart *
-speedchart_new (int y, int x, int cols, gboolean shown, int max, int current)
+speedchart_new (int y, int x, int cols, gboolean shown, int max, int current, int height)
 {
     WSpeedChart *g;
     Widget *w;
@@ -165,7 +168,7 @@ speedchart_new (int y, int x, int cols, gboolean shown, int max, int current)
 /* --------------------------------------------------------------------------------------------- */
 
 void
-speedchart_set_value (WSpeedChart * g, int max, int current) //TODO: add bps here
+speedchart_set_value (WSpeedChart * g, int max, int current)
 {
     if (g->current == current && g->max == max)
         return;                 /* Do not flicker */
